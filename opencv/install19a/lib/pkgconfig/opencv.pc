@@ -1,0 +1,13 @@
+# Package Information for pkg-config
+
+prefix=/home/cmeng/tengine_3516/tengine/3rdparty/install
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir_old=${prefix}/include/opencv
+includedir_new=${prefix}/include
+
+Name: OpenCV
+Description: Open Source Computer Vision Library
+Version: 2.4.13.7
+Libs: -L${exec_prefix}/lib -lopencv_core -lopencv_highgui -lopencv_imgproc -lopencv_objdetect -lopencv_photo -lopencv_video
+Cflags: -I${includedir_old} -I${includedir_new}
