@@ -26,9 +26,9 @@ Tengine example for run nnie devices
 
 # Step 4 ： 修改编译脚本 
 linux_build.sh 修改如下两个目录 ：
-**TENGINE_SO_PATH 这个路径来自于步骤2下载的目录主路径 ：
+TENGINE_SO_PATH 这个路径来自于步骤2下载的目录主路径 ：
    TENGINE_SO_PATH=/home/qli/Hisi3516CV500/Tengine1.7.1-Hi3516cv500
-**NNIE_SDK_DEPENDENCE_PATH 来自于步骤3里面安装的路径     
+NNIE_SDK_DEPENDENCE_PATH 来自于步骤3里面安装的路径     
   NNIE_SDK_DEPENDENCE_PATH=/home/qli/Hisi3516CV500/Hi3516CV500R001C02SPC001/01.software/board/Hi3516CV500_SDK_V2.0.0.1/package/mpp_smp_linux
 
 # Step5 ：编译 
