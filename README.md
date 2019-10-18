@@ -1,9 +1,16 @@
 # tengine-nnie
-Tengine example for run nnie devices
+Tengine example for run nnie devices。
+功能说明： 
+	该工程适用于海思3516CV500,3516DV300,3519AV100 三个硬件平台下用tengine进行NN推理。
+	目前支持的网络模型有 ：FasterrrcnnAlexnet, cnn ,ssd, yolov1, yolov2, yolov3 
+
+该库有两个依赖：
+	1，依赖海思的编译链，如步骤1所示，如果没有安装过需要按照步骤1安装。
+	2，依赖tengine的版本库 ，按照步骤2下载对应版本
 
 # Step 1 :  安装海思的编译器 
   解压海思资料：arm-himix200-linux.tgz  
- cd arm-himix200-linux
+  cd arm-himix200-linux
   chmod  arm-himix200-linux.install 
   sourch ./arm-himix200-linux.install
   ./arm-himix200-linux.install 
@@ -19,8 +26,8 @@ Tengine example for run nnie devices
   
 # Step 3 : 下载安装海思的依赖库 
   下载链接：https://pan.baidu.com/s/13cEi_omGo-DkrnKdqwjGew    提取码：tukl 
-  unrar Hi3516C V500R001C02SPC002.rar 
-  cd Hi3516C V500R001C02SPC002/01.software/board  
+  unrar Hi3516CV500R001C02SPC001.rar 
+  cd Hi3516CV500R001C02SPC001/01.software/board  
   tar xzvf  Hi3516CV500_SDK_V2.0.0.2.tgz
   bash  sdk.unpack 
   此时会在当前目录生成：smp\a7_linux\mpp ，该目录路径下面操作需要配置
@@ -35,4 +42,6 @@ linux_build.sh 修改如下两个目录 ：
 # Step5 ：编译 
     直接执行linux_build.sh 脚本即可
 
+# Step5 ：执行 
+    请参照Test目录下的脚本实现
 
