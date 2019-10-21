@@ -15,8 +15,12 @@ if [ "$1" = "LIB" ]; then
 	cp ${TENGINE_ROOT}/tengine-plugin/NNIE/source/inst_mnist_cycle.wk ./
 	cp ${TENGINE_ROOT}/tengine-plugin/NNIE/source/build/test_nnie_all   ./
 
+	cp ../opencv/install19a/lib/libopencv_core.so.2.4     ./
+	cp ../opencv/install19a/lib/libopencv_highgui.so.2.4  ./
+	cp ../opencv/install19a/lib/libopencv_imgproc.so.2.4  ./
+	
 	cp /home/qli/Hisi3516CV500/NNIE/sdk19a/sample/svp/nnie/data  ./ -rf
-	cp /home/qli/Hisi3516CV500//NNIE/nnieplugin/test/inst_alexnet_frcnn_cycle_cpu.cfg  ./ -rf
+	cp /home/qli/Hisi3516CV500/NNIE/nnieplugin/test/inst_alexnet_frcnn_cycle_cpu.cfg  ./ -rf
 fi
 
 if [ "$1" = "RUN" ]; then 
