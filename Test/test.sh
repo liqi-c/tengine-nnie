@@ -10,22 +10,27 @@ if [ "$1" = "LIB" ]; then
 	cp ${TENGINE_ROOT}/pre-built/linux_arm32/lib/libtengine.so  ./
 	cp ${TENGINE_ROOT}/tengine-plugin/NNIE/pre-built/lib/*      ./  -rf
 	
-	cp ${TENGINE_ROOT}/tengine-plugin/NNIE/source/build/sample_nnie_plugin   ./
-	cp ${TENGINE_ROOT}/tengine-plugin/NNIE/source/test_yu.jpg.rgb ./
-	cp ${TENGINE_ROOT}/tengine-plugin/NNIE/source/inst_mnist_cycle.wk ./
-	cp ${TENGINE_ROOT}/tengine-plugin/NNIE/source/build/test_nnie_all   ./
+	cp ../source/build/sample_nnie_plugin   ./
+	cp ../source/build/test_nnie_all   ./
 
 	cp ../opencv/install19a/lib/libopencv_core.so.2.4     ./
 	cp ../opencv/install19a/lib/libopencv_highgui.so.2.4  ./
 	cp ../opencv/install19a/lib/libopencv_imgproc.so.2.4  ./
 	
-	cp /home/qli/Hisi3516CV500/NNIE/sdk19a/sample/svp/nnie/data  ./ -rf
-	cp /home/qli/Hisi3516CV500/NNIE/nnieplugin/test/inst_alexnet_frcnn_cycle_cpu.cfg  ./ -rf
+	cp ${NNIE_SDK_PATH}/sample/svp/nnie/data  ./ -rf
+	##  cp ${NNIE_SDK_PATH}/lib/* ./  -rf 
+
 fi
 
 if [ "$1" = "RUN" ]; then 
 	echo " Run Test "
-	export LD_LIBRARY_PATH=/mnt/ko/libs
+	
+	### 这里面提供了海思的一些库，如果你板卡当前目录下无此目录，则需要拷贝
+	##    Hi3516CV500R001C02SPC001/01.software/board/Hi3516CV500_SDK_V2.0.0.1/smp/a7_linux/mpp/lib/ 
+	##  cp ${NNIE_SDK_PATH}/lib/* ./  -rf 
+	##  目录到板卡对应的执行目录
+	export LD_LIBRARY_PATH=/mnt/ko/libs   
+	
 	./sample_nnie_plugin
 	./test_nnie_all -m 2
 fi
