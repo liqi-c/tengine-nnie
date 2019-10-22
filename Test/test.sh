@@ -18,7 +18,7 @@ if [ "$1" = "LIB" ]; then
 	cp ../opencv/install19a/lib/libopencv_imgproc.so.2.4  ./
 	
 	cp ${NNIE_SDK_PATH}/sample/svp/nnie/data  ./ -rf
-	##  cp ${NNIE_SDK_PATH}/lib/* ./  -rf 
+	cp ${NNIE_SDK_PATH}/lib/* ./  -rf 
 
 fi
 
@@ -29,7 +29,7 @@ if [ "$1" = "RUN" ]; then
 	##    Hi3516CV500R001C02SPC001/01.software/board/Hi3516CV500_SDK_V2.0.0.1/smp/a7_linux/mpp/lib/ 
 	##  cp ${NNIE_SDK_PATH}/lib/* ./  -rf 
 	##  目录到板卡对应的执行目录
-	export LD_LIBRARY_PATH=/mnt/ko/libs   
+	export LD_LIBRARY_PATH=./   
 	
 	./sample_nnie_plugin
 	./test_nnie_all -m 2

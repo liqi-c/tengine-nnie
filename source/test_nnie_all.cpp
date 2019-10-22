@@ -3742,9 +3742,11 @@ static HI_S32 TEST_NNIE_Detection_Yolov3_PrintResult(SVP_BLOB_S *pstDstScore,
 
 void TEST_NNIE_Yolov3()
 {
-   const char *image_file = "./data/nnie_image/rgb_planar/dog_bike_car_416x416.bgr";
+ //  const char *image_file = "./data/nnie_image/rgb_planar/dog_bike_car_416x416.bgr";
     const char *image_file_org = "./data/nnie_image/rgb_planar/dog_bike_car.jpg";
-    const char *model_file = "./data/nnie_model/detection/inst_yolov3_cycle.wk";
+ //   const char *model_file = "./data/nnie_model/detection/inst_yolov3_cycle.wk";
+	const char *image_file = "./dog_bike_car_416x416.bgr";
+    const char *model_file = "./inst_yolov3_cycle.wk";
     struct timeval t0, t1;
     /* prepare input data */
     struct stat statbuf;
