@@ -22,7 +22,7 @@ Tengine example for run nnie devices。
   arm-himix200-linux-as   
   
 # Step 2 : 下载Tengine的对应的版本库 
-  下载地址：http://www.tengine.org.cn/info.php?class_id=105105  
+  更新地址： http://www.openailab.com/info.php?class_id=102101
   
 # Step 3 : 下载安装海思的依赖库 
   下载链接：https://pan.baidu.com/s/13cEi_omGo-DkrnKdqwjGew    提取码：tukl 
