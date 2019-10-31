@@ -11,7 +11,7 @@ Tengine example for run nnie devices。
 # Step 1 :  安装海思的编译器 
   解压海思资料：arm-himix200-linux.tgz  
   cd arm-himix200-linux
-  chmod  arm-himix200-linux.install 
+  chmod  +x arm-himix200-linux.install 
   sourch ./arm-himix200-linux.install
   ./arm-himix200-linux.install 
 
