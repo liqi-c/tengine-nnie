@@ -10,16 +10,17 @@ Tengine example for run nnie devices。
 
 # Step 1 :  安装海思的编译器   
   解压海思资料：arm-himix200-linux.tgz    
+  tar xvf arm-himix200-linux.tgz 
   cd arm-himix200-linux  
   chmod  +x arm-himix200-linux.install   
-  sourch ./arm-himix200-linux.install  
-  ./arm-himix200-linux.install   
+  source ./arm-himix200-linux.install   
+  sudo ./arm-himix200-linux.install   
 
-  安装完成之后输入arm-himix200-linux- 会提示有哪些编译工具  
-  $ arm-himix200-linux-  
-  arm-himix200-linux-addr2line   arm-himix200-linux-g++         arm-himix200-linux-gcov-tool   arm-himix200-linux-ranlib  
-  arm-himix200-linux-ar          arm-himix200-linux-gcc         arm-himix200-linux-gprof       arm-himix200-linux-readelf  
-  arm-himix200-linux-as     
+  安装完成之后输入arm-himix200-linux- 会提示有哪些编译工具   
+  $ arm-himix200-linux-   
+  arm-himix200-linux-addr2line   arm-himix200-linux-g++         arm-himix200-linux-gcov-tool   arm-himix200-linux-ranlib   
+  arm-himix200-linux-ar          arm-himix200-linux-gcc         arm-himix200-linux-gprof       arm-himix200-linux-readelf   
+  arm-himix200-linux-as      
   
 # Step 2 : 下载Tengine的对应的版本库    
   更新地址： http://www.openailab.com/info.php?class_id=102101   
