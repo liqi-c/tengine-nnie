@@ -10,8 +10,8 @@ Tengine example for run nnie devices。
 
 # Step 1 :  安装海思的编译器   
   解压海思资料：arm-himix200-linux.tgz    
-  tar xvf arm-himix200-linux.tgz 
-  cd arm-himix200-linux  
+  tar xvf arm-himix200-linux.tgz    
+  cd arm-himix200-linux    
   chmod  +x arm-himix200-linux.install   
   source ./arm-himix200-linux.install   
   sudo ./arm-himix200-linux.install   
@@ -31,7 +31,9 @@ Tengine example for run nnie devices。
   cd Hi3516CV500R001C02SPC001/01.software/board  
   tar xzvf  Hi3516CV500_SDK_V2.0.0.2.tgz
   bash  sdk.unpack 
-  此时会在当前目录生成：smp\a7_linux\mpp ，该目录路径下面操作需要配置
+  此时会在当前目录生成：smp\a7_linux\mpp ，该目录路径下面操作需要配置  
+  说明： 如果您使用的是其他的海思的依赖库，请自行判断正确的路径，可能和我这一步描述的稍有差异。  
+  
 
 # Step 4 ： 修改编译脚本   
 linux_build.sh 修改如下两个目录 ：  
@@ -45,4 +47,8 @@ linux_build.sh 修改如下两个目录 ：
 
 # Step5 ：执行   
     请参照Test目录下的脚本实现  
+
+## 其他重点： 
+   1， 如果编译遇到opencv的错误，请参照issue说明。
+
 
