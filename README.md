@@ -29,10 +29,10 @@ Tengine example for run nnie devices。
   下载链接：https://pan.baidu.com/s/13cEi_omGo-DkrnKdqwjGew    提取码：tukl   
   unrar Hi3516CV500R001C02SPC001.rar   
   cd Hi3516CV500R001C02SPC001/01.software/board  
-  tar xzvf  Hi3516CV500_SDK_V2.0.0.2.tgz
-  bash  sdk.unpack 
-  此时会在当前目录生成：smp\a7_linux\mpp ，该目录路径下面操作需要配置  
-  说明： 如果您使用的是其他的海思的依赖库，请自行判断正确的路径，可能和我这一步描述的稍有差异。  
+  tar xzvf  Hi3516CV500_SDK_V2.0.0.2.tgz   
+  bash  sdk.unpack    
+  此时会在当前目录生成：smp\a7_linux\mpp ，该目录下有编译需要依赖的库和头文件     
+  说明： 如果您使用的是其他版本的海思依赖库，请自行判断正确的路径，可能和我这一步描述的稍有差异。  
   
 
 # Step 4 ： 修改编译脚本   
