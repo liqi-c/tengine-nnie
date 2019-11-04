@@ -1,4 +1,6 @@
 #!/bin/bash
+# 该脚本在主机环境下运行，需要配置TENGINE_ROOT和NNIE_SDK_PATH的目录，执行目录为挂载的共享目录
+#  执行脚本的目的是为了将依赖文件拷贝到共享目录，然后后面再板卡侧能顺利执行测试程序
 
 TENGINE_ROOT=/home/qli/Hisi3516CV500/Tengine1.7.1-Hi3516cv500/
 NNIE_SDK_PATH=/home/qli/Hisi3516CV500/Hi3516CV500R001C02SPC001/01.software/board/Hi3516CV500_SDK_V2.0.0.1/smp/a7_linux/mpp
