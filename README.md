@@ -20,7 +20,8 @@ Tengine example for run nnie devices。
   $ arm-himix200-linux-   
   arm-himix200-linux-addr2line   arm-himix200-linux-g++         arm-himix200-linux-gcov-tool   arm-himix200-linux-ranlib   
   arm-himix200-linux-ar          arm-himix200-linux-gcc         arm-himix200-linux-gprof       arm-himix200-linux-readelf   
-  arm-himix200-linux-as      
+  arm-himix200-linux-as       
+  下载链接：https://pan.baidu.com/s/13cEi_omGo-DkrnKdqwjGew 提取码：tukl  
   
 # Step 2 : 下载Tengine的对应的版本库    
   更新地址： http://www.openailab.com/info.php?class_id=102101   
