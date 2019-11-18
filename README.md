@@ -22,6 +22,7 @@ Tengine example for run nnie devices。
   arm-himix200-linux-ar          arm-himix200-linux-gcc         arm-himix200-linux-gprof       arm-himix200-linux-readelf   
   arm-himix200-linux-as       
   下载链接：https://pan.baidu.com/s/13cEi_omGo-DkrnKdqwjGew 提取码：tukl  
+  如果执行arm-himix200-linux-gcc 提示文件格式不识别，可能是系统和编译链不兼容，ubuntu18.04的虚拟机和windows的子系统偶然会出现这个问题。
   
 # Step 2 : 下载Tengine的对应的版本库    
   更新地址： http://www.openailab.com/info.php?class_id=102101   
@@ -37,7 +38,7 @@ Tengine example for run nnie devices。
   
 
 # Step 4 ： 修改编译脚本   
-linux_build.sh 修改如下两个目录 ：  
+  主目录下脚本：linux_build.sh 修改如下两个目录 ：  
 #### TENGINE_SO_PATH 这个路径来自于步骤2下载的目录主路径 ：  
     TENGINE_SO_PATH=/home/qli/Hisi3516CV500/Tengine1.7.1-Hi3516cv500  
 #### NNIE_SDK_DEPENDENCE_PATH 来自于步骤3里面安装的路径       
