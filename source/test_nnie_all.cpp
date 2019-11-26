@@ -30,6 +30,8 @@
 #include <fstream>
 #include <iomanip>
 #include <math.h>
+#include <omp.h>
+#include <arm_neon.h>
 #include "mpi_sys.h"
 #include "mpi_vb.h"
 #include <sys/time.h>
@@ -313,6 +315,154 @@ static HI_S32 TEST_NNIE_NonRecursiveArgQuickSort(HI_S32 *ps32Array,
     }
     return HI_SUCCESS;
 }
+#if 1
+
+static void OAL_Overlap(HI_S32 s32Area0,HI_S16 s16XMin0, HI_S16 s16YMin0, HI_S16 s16XMax0,HI_S16 s16YMax0,HI_S32 s32Thresh, HI_S16* ps16Box,HI_U32 * pu32IsLeaved)
+{
+    HI_S32 quant_base = 4096;
+    int16x8x4_t vdata = vld4q_s16(ps16Box);
+    int16x8_t vxmin = vdata.val[0];
+    int16x8_t vymin = vdata.val[1];
+    int16x8_t vxmax = vdata.val[2];
+    int16x8_t vymax = vdata.val[3];
+
+    int16x8_t vsrc_xmin = vdupq_n_s16(s16XMin0); 
+    int16x8_t vsrc_ymin = vdupq_n_s16(s16YMin0); 
+    int16x8_t vsrc_xmax = vdupq_n_s16(s16XMax0); 
+    int16x8_t vsrc_ymax = vdupq_n_s16(s16YMax0); 
+    
+    int16x8_t vconst_one = vdupq_n_s16(1); 
+    int16x8_t vconst_zero = vdupq_n_s16(0); 
+    
+    int16x8_t vinter_xmin = vmaxq_s16(vsrc_xmin,vxmin);
+    int16x8_t vinter_ymin = vmaxq_s16(vsrc_ymin,vymin); 
+    int16x8_t vinter_xmax = vminq_s16(vsrc_xmax,vxmax);
+    int16x8_t vinter_ymax = vminq_s16(vsrc_ymax,vymax);
+  
+    // cal the inter width and height 
+    int16x8_t vinter_width = vsubq_s16(vinter_xmax,vinter_xmin);
+    vinter_width = vaddq_s16(vinter_width,vconst_one);
+    int16x8_t vinter_height = vsubq_s16(vinter_ymax,vinter_ymin);
+    vinter_height = vaddq_s16(vinter_height,vconst_one);
+    vinter_width = vmaxq_s16(vinter_width,vconst_zero);
+    vinter_height = vmaxq_s16(vinter_height,vconst_zero);
+    // cal the  next_box area 
+    int16x8_t vboxs_width = vsubq_s16(vxmax,vxmin);
+    vboxs_width = vaddq_s16(vboxs_width,vconst_one);
+    int16x8_t vboxs_height = vsubq_s16(vymax,vymin);
+    vboxs_height = vaddq_s16(vboxs_height,vconst_one);
+    
+    int16x4_t vboxs_width_low = vget_low_s16(vboxs_width); 
+    int16x4_t vboxs_height_low = vget_low_s16(vboxs_height); 
+    int32x4_t vboxs_area_low = vmull_s16(vboxs_width_low,vboxs_height_low);
+    
+    int16x4_t vboxs_width_high = vget_high_s16(vboxs_width); 
+    int16x4_t vboxs_height_high = vget_high_s16(vboxs_height); 
+    
+    int32x4_t vboxs_area_high = vmull_s16(vboxs_width_high,vboxs_height_high);
+    
+    // cal the inter area  
+    int16x4_t vinter_width_low = vget_low_s16(vinter_width); 
+    int16x4_t vinter_height_low = vget_low_s16(vinter_height); 
+    int32x4_t vinter_area_low = vmull_s16(vinter_width_low,vinter_height_low);
+    int16x4_t vinter_width_high = vget_high_s16(vinter_width); 
+    int16x4_t vinter_height_high = vget_high_s16(vinter_height); 
+    //int32x4_t vinter_area_high = vmull_high_s16(vinter_width,vinter_height);
+    int32x4_t vinter_area_high = vmull_s16(vinter_width_high,vinter_height_high);
+    
+    //cal the totol area
+    int32x4_t vsrc_area = vdupq_n_s32(s32Area0);
+    int32x4_t vtotal_area_low = vaddq_s32(vsrc_area,vboxs_area_low);  
+    int32x4_t vtotal_area_high = vaddq_s32(vsrc_area,vboxs_area_high);  
+
+    vtotal_area_low = vsubq_s32(vtotal_area_low,vinter_area_low);  
+    vtotal_area_high = vsubq_s32(vtotal_area_high,vinter_area_high);  
+
+    //ouput the Iou result  
+    int32x4_t vthresh = vdupq_n_s32(s32Thresh);
+    int32x4_t vquant_base = vdupq_n_s32(quant_base);
+  
+    vinter_area_low = vmulq_s32(vinter_area_low,vquant_base);
+    vinter_area_high = vmulq_s32(vinter_area_high,vquant_base);
+    vtotal_area_low = vmulq_s32(vtotal_area_low,vthresh);
+    vtotal_area_high = vmulq_s32(vtotal_area_high,vthresh);
+
+
+    uint32x4_t is_gte_low = vcgeq_s32(vinter_area_low,vtotal_area_low);
+    uint32x4_t is_gte_high= vcgeq_s32(vinter_area_high,vtotal_area_high);
+    
+    //store the data 
+    uint32x4_t vmask_low = vld1q_u32(pu32IsLeaved);
+    uint32x4_t vmask_high = vld1q_u32(pu32IsLeaved + 4);
+    is_gte_low = vorrq_u32(is_gte_low,vmask_low);
+    is_gte_high = vorrq_u32(is_gte_high,vmask_high);
+    vst1q_u32(pu32IsLeaved,is_gte_low);
+    vst1q_u32(pu32IsLeaved+4,is_gte_high);
+
+}
+static HI_S32 OAL_NonMaxSuppression(HI_S32 *ps32Proposals, HI_U32 u32AnchorsNum,HI_U32 u32NmsThresh, HI_U32 u32MaxRoiNum)
+{
+      /****** define variables *******/
+    HI_S16 s16XMin1 = 0;
+    HI_S16 s16YMin1 = 0;
+    HI_S16 s16XMax1 = 0;
+    HI_S16 s16YMax1 = 0;
+
+    HI_U32 i = 0;
+    HI_U32 j = 0;
+    HI_U32 u32Num = 0;
+    HI_S32 s32Area0 = 0;
+    
+    HI_U32 tmp = (u32AnchorsNum/8 + 1) * 8;
+    HI_S16 * ps16Box = (HI_S16*)malloc(sizeof(HI_S16)* tmp * 4);
+    HI_U32 * pu32IsLeaved = (HI_U32*)malloc(sizeof(HI_U32)* tmp);
+    
+    for(i = 0; i < u32AnchorsNum;++i)
+    {
+        ps16Box[i * 4 + 0] = (HI_S16)ps32Proposals[i * 6 + 0];
+        ps16Box[i * 4 + 1] = (HI_S16)ps32Proposals[i * 6 + 1];
+        ps16Box[i * 4 + 2] = (HI_S16)ps32Proposals[i * 6 + 2];
+        ps16Box[i * 4 + 3] = (HI_S16)ps32Proposals[i * 6 + 3];
+        pu32IsLeaved[i] = ps32Proposals[i * 6 + 5];
+    }
+    
+    // #pragma omp parallel for num_threads(6)
+    for (i = 0; i < u32AnchorsNum && u32Num < u32MaxRoiNum; i++)
+    {
+        if (pu32IsLeaved[i] == 0)
+        {
+            u32Num++;
+            s16XMin1 = ps16Box[4 * i];
+            s16YMin1 = ps16Box[4 * i + 1];
+            s16XMax1 = ps16Box[4 * i + 2];
+            s16YMax1 = ps16Box[4 * i + 3];
+            s32Area0 = (HI_S32)(s16YMax1 -  s16YMin1 + 1) * (s16XMax1 - s16XMin1 + 1);
+            for (j = i + 1; j < u32AnchorsNum;)
+            {
+                if (pu32IsLeaved[j] == 0)
+                {
+                    (void)OAL_Overlap(s32Area0,s16XMin1, s16YMin1, s16XMax1, s16YMax1,(HI_S32)u32NmsThresh,&ps16Box[j*4],&pu32IsLeaved[j]);
+                    j = j + 8;
+                }
+                else
+                {
+                    j = j + 1;
+                }
+            }
+        }
+    }
+    
+    for(i = 0; i < u32AnchorsNum;++i)
+    {
+        ps32Proposals[i * 6 + 5] = pu32IsLeaved[i];
+    }
+    
+    free(ps16Box);
+    free(pu32IsLeaved);
+    
+    return HI_SUCCESS;
+}
+#endif
 
 static HI_S32 TEST_NNIE_Overlap(HI_S32 s32XMin1, HI_S32 s32YMin1, HI_S32 s32XMax1, HI_S32 s32YMax1, HI_S32 s32XMin2,
                                 HI_S32 s32YMin2, HI_S32 s32XMax2, HI_S32 s32YMax2, HI_S32 *s32AreaSum, HI_S32 *s32AreaInter)
@@ -370,6 +520,7 @@ static HI_S32 TEST_NNIE_NonMaxSuppression(HI_S32 *ps32Proposals, HI_U32 u32Ancho
     HI_U32 u32Num = 0;
     HI_BOOL bNoOverlap = HI_TRUE;
 
+    // #pragma omp parallel for num_threads(6)
     for (i = 0; i < u32AnchorsNum && u32Num < u32MaxRoiNum; i++)
     {
         if (ps32Proposals[TEST_NNIE_PROPOSAL_WIDTH * i + 5] == 0)
@@ -392,6 +543,7 @@ static HI_S32 TEST_NNIE_NonMaxSuppression(HI_S32 *ps32Proposals, HI_U32 u32Ancho
                     {
                         continue;
                     }
+                    //TODO 3
                     (void)TEST_NNIE_Overlap(s32XMin1, s32YMin1, s32XMax1, s32YMax1, s32XMin2, s32YMin2, s32XMax2, s32YMax2, &s32AreaTotal, &s32AreaInter);
                     if (s32AreaInter * TEST_NNIE_QUANT_BASE > ((HI_S32)u32NmsThresh * s32AreaTotal))
                     {
@@ -404,6 +556,7 @@ static HI_S32 TEST_NNIE_NonMaxSuppression(HI_S32 *ps32Proposals, HI_U32 u32Ancho
                             ps32Proposals[TEST_NNIE_PROPOSAL_WIDTH * i + 5] = 1;
                         }
                     }
+                    //TODO faster nms
                 }
             }
         }
@@ -968,7 +1121,6 @@ static HI_S32 TEST_NNIE_SoftMax(HI_FLOAT *pf32Src, HI_U32 u32Num)
     HI_FLOAT f32Max = 0;
     HI_FLOAT f32Sum = 0;
     HI_U32 i = 0;
-
     for (i = 0; i < u32Num; ++i)
     {
         if (f32Max < pf32Src[i])
@@ -976,7 +1128,6 @@ static HI_S32 TEST_NNIE_SoftMax(HI_FLOAT *pf32Src, HI_U32 u32Num)
             f32Max = pf32Src[i];
         }
     }
-
     for (i = 0; i < u32Num; ++i)
     {
         pf32Src[i] = (HI_FLOAT)TEST_NNIE_QuickExp((HI_S32)((pf32Src[i] - f32Max) * TEST_NNIE_QUANT_BASE));
@@ -989,6 +1140,7 @@ static HI_S32 TEST_NNIE_SoftMax(HI_FLOAT *pf32Src, HI_U32 u32Num)
     }
     return HI_SUCCESS;
 }
+
 
 static HI_S32 TEST_NNIE_FilterLowScoreBbox(HI_S32 *ps32Proposals, HI_U32 u32AnchorsNum,
                                            HI_U32 u32FilterThresh, HI_U32 *u32NumAfterFilter)
@@ -1208,32 +1360,47 @@ static HI_S32 SVP_NNIE_Rpn(HI_S32 **pps32Src, HI_U32 u32NumRatioAnchors,
     u32LineSize = u32ConvStride / sizeof(HI_U32);
     u32SrcProbBias = 0;
     u32SrcBboxBias = 0;
-
-    for (c = 0; c < pu32ConvChannel[1]; c++)
+    //#pragma omp parallel for num_threads(6)
+    for (c = 0; c < pu32ConvChannel[1]; c++) 
     {
         for (h = 0; h < pu32ConvHeight[1]; h++)
         {
             for (w = 0; w < pu32ConvWidth[1]; w++)
             {
+                // struct timeval t0, t1;
+                // gettimeofday(&t0, NULL);
                 u32SrcBboxIndex = u32SrcBboxBias + c * u32MapSize + h * u32LineSize + w;
-                u32SrcBgProbIndex = u32SrcProbBias + (c / TEST_NNIE_COORDI_NUM) * u32MapSize + h * u32LineSize + w;
-                u32SrcFgProbIndex = u32BgBlobSize + u32SrcBgProbIndex;
-
                 u32DesBox = (u32AnchorsPerPixel) * (h * pu32ConvWidth[1] + w) + c / TEST_NNIE_COORDI_NUM;
-
                 u32DesBboxDeltaIndex = TEST_NNIE_COORDI_NUM * u32DesBox + c % TEST_NNIE_COORDI_NUM;
                 ps32BboxDelta[u32DesBboxDeltaIndex] = (HI_S32)pps32Src[1][u32SrcBboxIndex];
-
+                /*
                 u32DesScoreIndex = (TEST_NNIE_SCORE_NUM)*u32DesBox;
-                pf32Scores[u32DesScoreIndex] = (HI_FLOAT)((HI_S32)pps32Src[0][u32SrcBgProbIndex]) / TEST_NNIE_QUANT_BASE;
-                pf32Scores[u32DesScoreIndex + 1] = (HI_FLOAT)((HI_S32)pps32Src[0][u32SrcFgProbIndex]) / TEST_NNIE_QUANT_BASE;
+                u32SrcBgProbIndex = u32SrcProbBias + (c / TEST_NNIE_COORDI_NUM) * u32MapSize + h * u32LineSize + w;
+                u32SrcFgProbIndex = u32BgBlobSize + u32SrcBgProbIndex;
+                pf32Scores[u32DesScoreIndex] =(HI_FLOAT) ((HI_S32)pps32Src[0][u32SrcBgProbIndex] / TEST_NNIE_QUANT_BASE); //DONE 4.919ms  4.859ms
+                pf32Scores[u32DesScoreIndex + 1] = (HI_FLOAT) ((HI_S32)pps32Src[0][u32SrcFgProbIndex]/ TEST_NNIE_QUANT_BASE); //TODO 1
+                */
+            }
+        }
+    }
+    for (c = 0; c < pu32ConvChannel[1]; c++) 
+    {
+        for (h = 0; h < pu32ConvHeight[1]; h++)
+        {
+            for (w = 0; w < pu32ConvWidth[1]; w++)
+            {
+                u32DesBox = (u32AnchorsPerPixel) * (h * pu32ConvWidth[1] + w) + c / TEST_NNIE_COORDI_NUM;
+                u32DesScoreIndex = (TEST_NNIE_SCORE_NUM)*u32DesBox;
+                u32SrcBgProbIndex = u32SrcProbBias + (c / TEST_NNIE_COORDI_NUM) * u32MapSize + h * u32LineSize + w;
+                u32SrcFgProbIndex = u32BgBlobSize + u32SrcBgProbIndex;
+                pf32Scores[u32DesScoreIndex] =(HI_FLOAT) ((HI_S32)pps32Src[0][u32SrcBgProbIndex] / TEST_NNIE_QUANT_BASE); 
+                pf32Scores[u32DesScoreIndex + 1] = (HI_FLOAT) ((HI_S32)pps32Src[0][u32SrcFgProbIndex]/ TEST_NNIE_QUANT_BASE);
             }
         }
     }
     gettimeofday(&t1, NULL);
     mytime_0 = (float)((t1.tv_sec * 1000000 + t1.tv_usec) - (t0.tv_sec * 1000000 + t0.tv_usec)) / 1000;
-    std::cout << "  do transpose, convert the blob from (M,C,H,W) to (M,H,W,C) used Time: " << mytime_0 << " ms\n";
-    std::cout << "--------------------------------------\n";
+    std::cout << "do transpose, convert the blob from (M,C,H,W) to (M,H,W,C) used Time: " << mytime_0 << " ms\n";
     gettimeofday(&t0, NULL);
     /************************* do softmax ****************************/
     pf32Ptr = pf32Scores;
@@ -1332,12 +1499,13 @@ static HI_S32 SVP_NNIE_Rpn(HI_S32 **pps32Src, HI_U32 u32NumRatioAnchors,
     std::cout << "--------------------------------------\n";
     gettimeofday(&t0, NULL);
     /* do nms to remove highly overlapped bbox */
-    (void)TEST_NNIE_NonMaxSuppression(ps32Proposals, u32NumAfterFilter, u32NmsThresh, u32MaxRois); /* function NMS */
+    (void)OAL_NonMaxSuppression(ps32Proposals,u32NumAfterFilter, u32NmsThresh,u32MaxRois);
+    //(void)TEST_NNIE_NonMaxSuppression(ps32Proposals, u32NumAfterFilter, u32NmsThresh, u32MaxRois); 
     gettimeofday(&t1, NULL);
     mytime_0 = (float)((t1.tv_sec * 1000000 + t1.tv_usec) - (t0.tv_sec * 1000000 + t0.tv_usec)) / 1000;
-    std::cout << " do nms to remove highly overlapped bbox used Time: " << mytime_0 << " ms\n";
+    std::cout << "================OAL NMS use time =====================: " << mytime_0 << " ms\n";
     std::cout << "--------------------------------------\n";
-    gettimeofday(&t0, NULL);
+ 
     /************** write the final result to output ***************/
     u32RoiCount = 0;
     for (i = 0; i < u32NumAfterFilter; i++)
@@ -3518,7 +3686,7 @@ static HI_S32 TEST_NNIE_Yolov3_SoftwareInit(graph_t graph, TEST_NNIE_YOLOV3_SOFT
 
     return s32Ret;
 }
-
+#if 1
 static HI_S32 TEST_NNIE_Yolov3_GetResult(HI_S32 **pps32InputData, HI_U32 au32GridNumWidth[],
                                          HI_U32 au32GridNumHeight[], HI_U32 au32Stride[], HI_U32 u32EachGridBbox, HI_U32 u32ClassNum, HI_U32 u32SrcWidth,
                                          HI_U32 u32SrcHeight, HI_U32 u32MaxRoiNum, HI_U32 u32NmsThresh, HI_U32 u32ConfThresh,
@@ -3526,8 +3694,8 @@ static HI_S32 TEST_NNIE_Yolov3_GetResult(HI_S32 **pps32InputData, HI_U32 au32Gri
                                          HI_S32 *ps32TmpBuf, HI_S32 *ps32DstScore, HI_S32 *ps32DstRoi, HI_S32 *ps32ClassRoiNum)
 {
     HI_S32 *ps32InputBlob = NULL;
-    HI_FLOAT *pf32Permute = NULL;
     TEST_NNIE_YOLOV3_BBOX_S *pstBbox = NULL;
+    HI_FLOAT *pf32Permute = NULL;
     HI_S32 *ps32AssistBuf = NULL;
     HI_U32 u32TotalBboxNum = 0;
     HI_U32 u32ChnOffset = 0;
@@ -3540,12 +3708,13 @@ static HI_S32 TEST_NNIE_Yolov3_GetResult(HI_S32 **pps32InputData, HI_U32 au32Gri
     HI_FLOAT f32StartY;
     HI_FLOAT f32Width;
     HI_FLOAT f32Height;
-    HI_FLOAT f32ObjScore;
+    //HI_FLOAT f32ObjScore;
     HI_U32 u32MaxValueIndex = 0;
-    HI_FLOAT f32MaxScore;
+   // HI_FLOAT f32MaxScore;
     HI_S32 s32ClassScore;
     HI_U32 u32ClassRoiNum;
-    HI_U32 i = 0, j = 0, k = 0, c = 0, h = 0, w = 0;
+    HI_U32 i = 0, j = 0, k = 0 ;
+    HI_U32 c = 0,w = 0,h = 0;
     HI_U32 u32BlobSize = 0;
     HI_U32 u32MaxBlobSize = 0;
 
@@ -3568,7 +3737,9 @@ static HI_S32 TEST_NNIE_Yolov3_GetResult(HI_S32 **pps32InputData, HI_U32 au32Gri
     pf32Permute = (HI_FLOAT *)ps32TmpBuf;
     pstBbox = (TEST_NNIE_YOLOV3_BBOX_S *)(pf32Permute + u32MaxBlobSize / sizeof(HI_S32));
     ps32AssistBuf = (HI_S32 *)(pstBbox + u32TotalBboxNum);
-
+   
+    struct timeval t0, t1;
+    
     for (i = 0; i < TEST_NNIE_YOLOV3_REPORT_BLOB_NUM; i++)
     {
         //permute
@@ -3576,7 +3747,213 @@ static HI_S32 TEST_NNIE_Yolov3_GetResult(HI_S32 **pps32InputData, HI_U32 au32Gri
         ps32InputBlob = pps32InputData[i];
         u32ChnOffset = au32GridNumHeight[i] * au32GridNumWidth[i];
         u32HeightOffset = au32GridNumWidth[i];
+        int c_size = TEST_NNIE_YOLOV3_EACH_BBOX_INFER_RESULT_NUM * u32EachGridBbox;
+        printf("channel is %d，height is %d, width is %d\n",c_size ,au32GridNumHeight[i],au32GridNumWidth[i]);
+        gettimeofday(&t0, NULL);
+        
+        if( au32GridNumHeight[i] != 52)
+        {
+            #pragma omp parallel for
+            for(int al_c = 0; al_c < c_size; ++al_c)
+            {
+                HI_S32 * input_data_c = ps32InputBlob + al_c * u32ChnOffset;
+                for(unsigned int al_h = 0; al_h <au32GridNumHeight[i];al_h++)
+                {
+                    HI_FLOAT * permute = pf32Permute + al_h * au32GridNumWidth[i]*c_size;
+                     //permute[al_c] = (HI_FLOAT)(input_data_c[al_h*u32HeightOffset + al_w])/ TEST_NNIE_QUANT_BASE;
+                    for(unsigned int al_w= 0; al_w < au32GridNumWidth[i];al_w++)
+                    {
+                        permute[al_w * c_size+al_c] = (HI_FLOAT)(input_data_c[al_h*u32HeightOffset + al_w])/ TEST_NNIE_QUANT_BASE;
+                    }
+                }
+            }
+        }
+        else{
+            for (h = 0; h < au32GridNumHeight[i]; h++)
+            {
+                for (w = 0; w < au32GridNumWidth[i]; w++)
+                {
+                    for (c = 0; c < TEST_NNIE_YOLOV3_EACH_BBOX_INFER_RESULT_NUM * u32EachGridBbox; c++)
+                    {
+                        pf32Permute[u32Offset++] = (HI_FLOAT)(ps32InputBlob[c * u32ChnOffset + h * u32HeightOffset + w]) / TEST_NNIE_QUANT_BASE;
+                    }
+                }
+            }
+        }
+        
+        gettimeofday(&t1, NULL);
+        std::cout << "--------------------------------------\n";
+        float mytime_0 = (float)((t1.tv_sec * 1000000 + t1.tv_usec) - (t0.tv_sec * 1000000 + t0.tv_usec)) / 1000;
+        std::cout << " OAL Permute  used time: " << mytime_0 << " ms\n";
+        std::cout << "--------------------------------------\n";
+      
+        gettimeofday(&t0, NULL);
+        int map_size = au32GridNumWidth[i] * au32GridNumHeight[i];
+        float * class_score = (float*)malloc(map_size * u32EachGridBbox * sizeof(float));
+        HI_U32 * max_val_index = (HI_U32*)malloc(map_size * u32EachGridBbox * sizeof(HI_U32)); 
+        gettimeofday(&t0, NULL);
+        #pragma omp parallel for 
+        for (int al_j = 0; al_j < map_size; al_j++)
+        {
+            for (unsigned int al_k = 0; al_k < u32EachGridBbox; al_k++)
+            {
+                int offset = (al_j * u32EachGridBbox + al_k) * TEST_NNIE_YOLOV3_EACH_BBOX_INFER_RESULT_NUM;
+                float obj_score = TEST_NNIE_SIGMOID(pf32Permute[offset + 4]);
+                (void)TEST_NNIE_SoftMax(&pf32Permute[offset + 5], u32ClassNum);
+                float max_score = TEST_NNIE_Yolov2_GetMaxVal(&pf32Permute[offset + 5], u32ClassNum, &max_val_index[al_j * u32EachGridBbox + al_k]);
+                class_score[al_j * u32EachGridBbox + al_k] = (HI_S32)(max_score * obj_score * TEST_NNIE_QUANT_BASE);
+            }
+        }
+        for (j = 0; j < au32GridNumWidth[i] * au32GridNumHeight[i]; j++)
+        {
+            u32GridXIdx = j % au32GridNumWidth[i];
+            u32GridYIdx = j / au32GridNumWidth[i];
+            for (k = 0; k < u32EachGridBbox; k++)
+            {
+                u32MaxValueIndex = 0;
+                u32Offset = (j * u32EachGridBbox + k) * TEST_NNIE_YOLOV3_EACH_BBOX_INFER_RESULT_NUM;
+                //calculate score
+                s32ClassScore = class_score[j * u32EachGridBbox + k];
+                u32MaxValueIndex = max_val_index[j * u32EachGridBbox + k];
+                //filter low score roi
+                if (s32ClassScore > (HI_S32)u32ConfThresh)
+                {
+                    //decode bbox
+                    float a[4] = {-pf32Permute[u32Offset + 0], -pf32Permute[u32Offset + 1], pf32Permute[u32Offset + 2], pf32Permute[u32Offset + 3]};
+                    float x[4] = {0.f, 0.f, 0.f, 0.f};
+                    fast_exp_4f(a, x);
+                    f32StartX = ((HI_FLOAT)u32GridXIdx + TEST_NNIE_SIGMOID_NOEXP(x[0])) / au32GridNumWidth[i];
+                    f32StartY = ((HI_FLOAT)u32GridYIdx + TEST_NNIE_SIGMOID_NOEXP(x[1])) / au32GridNumHeight[i];
+                    f32Width = (HI_FLOAT)((x[2]) * af32Bias[i][2 * k]) / u32SrcWidth;
+                    f32Height = (HI_FLOAT)((x[3]) * af32Bias[i][2 * k + 1]) / u32SrcHeight;
+                    pstBbox[u32BboxNum].f32Xmin = (HI_FLOAT)(f32StartX - f32Width * 0.5f);
+                    pstBbox[u32BboxNum].f32Ymin = (HI_FLOAT)(f32StartY - f32Height * 0.5f);
+                    pstBbox[u32BboxNum].f32Xmax = (HI_FLOAT)(f32StartX + f32Width * 0.5f);
+                    pstBbox[u32BboxNum].f32Ymax = (HI_FLOAT)(f32StartY + f32Height * 0.5f);
+                    pstBbox[u32BboxNum].s32ClsScore = s32ClassScore;
+                    pstBbox[u32BboxNum].u32Mask = 0;
+                    pstBbox[u32BboxNum].u32ClassIdx = (HI_S32)(u32MaxValueIndex + 1);
+                    u32BboxNum++;
+                }
+            }
+        }
+        
+        free(class_score);
+        free(max_val_index);
 
+        gettimeofday(&t1, NULL);
+        std::cout << "--------------------------------------\n";
+        mytime_0 = (float)((t1.tv_sec * 1000000 + t1.tv_usec) - (t0.tv_sec * 1000000 + t0.tv_usec)) / 1000;
+        std::cout << "OAL Get box and score used time: " << mytime_0 << " ms\n";
+        std::cout << "--------------------------------------\n";
+     
+    }
+    gettimeofday(&t0, NULL);
+    // float mytime_exp = (float)((t1.tv_sec * 1000000 + t1.tv_usec) - (t0.tv_sec * 1000000 + t0.tv_usec)) / 1000;
+    //quick sort
+    (void)TEST_NNIE_Yolo_NonRecursiveArgQuickSort((HI_S32 *)pstBbox, 0, u32BboxNum - 1,
+                                                  sizeof(TEST_NNIE_YOLOV3_BBOX_S) / sizeof(HI_U32), 4, (TEST_NNIE_STACK_S *)ps32AssistBuf);
+    gettimeofday(&t1, NULL);
+    std::cout << "--------------------------------------\n";
+    float mytime_3 = (float)((t1.tv_sec * 1000000 + t1.tv_usec) - (t0.tv_sec * 1000000 + t0.tv_usec)) / 1000;
+    std::cout << " QuitSort  used time: " << mytime_3 << " ms\n";
+    std::cout << "--------------------------------------\n";                                              
+
+    gettimeofday(&t0, NULL);                                              
+    (void)TEST_NNIE_Yolov2_NonMaxSuppression(pstBbox, u32BboxNum, u32NmsThresh, sizeof(TEST_NNIE_YOLOV3_BBOX_S) / sizeof(HI_U32));
+    gettimeofday(&t1, NULL);
+    std::cout << "--------------------------------------\n";
+    mytime_3 = (float)((t1.tv_sec * 1000000 + t1.tv_usec) - (t0.tv_sec * 1000000 + t0.tv_usec)) / 1000;
+    std::cout << " NMS  used time: " << mytime_3 << " ms\n";
+    std::cout << "--------------------------------------\n";
+
+    //Get result
+    for (i = 1; i < u32ClassNum; i++)
+    {
+        u32ClassRoiNum = 0;
+        for (j = 0; j < u32BboxNum; j++)
+        {
+            if ((0 == pstBbox[j].u32Mask) && (i == pstBbox[j].u32ClassIdx) && (u32ClassRoiNum < u32MaxRoiNum))
+            {
+                *(ps32DstRoi++) = TEST_NNIE_MAX((HI_S32)(pstBbox[j].f32Xmin * u32SrcWidth), 0);
+                *(ps32DstRoi++) = TEST_NNIE_MAX((HI_S32)(pstBbox[j].f32Ymin * u32SrcHeight), 0);
+                *(ps32DstRoi++) = TEST_NNIE_MIN((pstBbox[j].f32Xmax * u32SrcWidth), u32SrcWidth);
+                *(ps32DstRoi++) = TEST_NNIE_MIN((pstBbox[j].f32Ymax * u32SrcHeight), u32SrcHeight);
+                *(ps32DstScore++) = pstBbox[j].s32ClsScore;
+                u32ClassRoiNum++;
+            }
+        }
+        *(ps32ClassRoiNum + i) = u32ClassRoiNum;
+    }
+    return HI_SUCCESS;
+}
+
+#else 
+static HI_S32 TEST_NNIE_Yolov3_GetResult(HI_S32 **pps32InputData, HI_U32 au32GridNumWidth[],
+                                         HI_U32 au32GridNumHeight[], HI_U32 au32Stride[], HI_U32 u32EachGridBbox, HI_U32 u32ClassNum, HI_U32 u32SrcWidth,
+                                         HI_U32 u32SrcHeight, HI_U32 u32MaxRoiNum, HI_U32 u32NmsThresh, HI_U32 u32ConfThresh,
+                                         HI_FLOAT af32Bias[TEST_NNIE_YOLOV3_REPORT_BLOB_NUM][TEST_NNIE_YOLOV3_EACH_GRID_BIAS_NUM],
+                                         HI_S32 *ps32TmpBuf, HI_S32 *ps32DstScore, HI_S32 *ps32DstRoi, HI_S32 *ps32ClassRoiNum)
+{
+    HI_S32 *ps32InputBlob = NULL;
+    TEST_NNIE_YOLOV3_BBOX_S *pstBbox = NULL;
+    HI_FLOAT *pf32Permute = NULL;
+    HI_S32 *ps32AssistBuf = NULL;
+    HI_U32 u32TotalBboxNum = 0;
+    HI_U32 u32ChnOffset = 0;
+    HI_U32 u32HeightOffset = 0;
+    HI_U32 u32BboxNum = 0;
+    HI_U32 u32GridXIdx;
+    HI_U32 u32GridYIdx;
+    HI_U32 u32Offset;
+    HI_FLOAT f32StartX;
+    HI_FLOAT f32StartY;
+    HI_FLOAT f32Width;
+    HI_FLOAT f32Height;
+    HI_FLOAT f32ObjScore;
+    HI_U32 u32MaxValueIndex = 0;
+    HI_FLOAT f32MaxScore;
+    HI_S32 s32ClassScore;
+    HI_U32 u32ClassRoiNum;
+    HI_U32 i = 0, j = 0, k = 0 ;
+    HI_U32 c = 0,w = 0,h = 0;
+    HI_U32 u32BlobSize = 0;
+    HI_U32 u32MaxBlobSize = 0;
+
+    for (i = 0; i < TEST_NNIE_YOLOV3_REPORT_BLOB_NUM; i++)
+    {
+        u32BlobSize = au32GridNumWidth[i] * au32GridNumHeight[i] * sizeof(HI_U32) *
+                      TEST_NNIE_YOLOV3_EACH_BBOX_INFER_RESULT_NUM * u32EachGridBbox;
+        if (u32MaxBlobSize < u32BlobSize)
+        {
+            u32MaxBlobSize = u32BlobSize;
+        }
+    }
+
+    for (i = 0; i < TEST_NNIE_YOLOV3_REPORT_BLOB_NUM; i++)
+    {
+        u32TotalBboxNum += au32GridNumWidth[i] * au32GridNumHeight[i] * u32EachGridBbox;
+    }
+
+    //get each tmpbuf addr
+    pf32Permute = (HI_FLOAT *)ps32TmpBuf;
+    pstBbox = (TEST_NNIE_YOLOV3_BBOX_S *)(pf32Permute + u32MaxBlobSize / sizeof(HI_S32));
+    ps32AssistBuf = (HI_S32 *)(pstBbox + u32TotalBboxNum);
+   
+    struct timeval t0, t1;
+    
+    //#pragma omp parallel for num_threads(6)
+    
+    printf("======TEST_NNIE_YOLOV3_REPORT_BLOB_NUM===:%d\n",TEST_NNIE_YOLOV3_REPORT_BLOB_NUM);
+    
+    for (i = 0; i < TEST_NNIE_YOLOV3_REPORT_BLOB_NUM; i++)
+    {
+        //permute
+        u32Offset = 0;
+        ps32InputBlob = pps32InputData[i];
+        u32ChnOffset = au32GridNumHeight[i] * au32GridNumWidth[i];
+        u32HeightOffset = au32GridNumWidth[i];
+        gettimeofday(&t0, NULL);
         for (h = 0; h < au32GridNumHeight[i]; h++)
         {
             for (w = 0; w < au32GridNumWidth[i]; w++)
@@ -3587,8 +3964,14 @@ static HI_S32 TEST_NNIE_Yolov3_GetResult(HI_S32 **pps32InputData, HI_U32 au32Gri
                 }
             }
         }
-
-        //decode bbox and calculate score
+        gettimeofday(&t1, NULL);
+        std::cout << "--------------------------------------\n";
+        float mytime_0 = (float)((t1.tv_sec * 1000000 + t1.tv_usec) - (t0.tv_sec * 1000000 + t0.tv_usec)) / 1000;
+        std::cout << " Permute  used time: " << mytime_0 << " ms\n";
+        std::cout << "--------------------------------------\n";                                              
+        
+        
+        gettimeofday(&t0, NULL);
         for (j = 0; j < au32GridNumWidth[i] * au32GridNumHeight[i]; j++)
         {
             u32GridXIdx = j % au32GridNumWidth[i];
@@ -3625,13 +4008,31 @@ static HI_S32 TEST_NNIE_Yolov3_GetResult(HI_S32 **pps32InputData, HI_U32 au32Gri
                 }
             }
         }
+        gettimeofday(&t1, NULL);
+        std::cout << "--------------------------------------\n";
+        mytime_0 = (float)((t1.tv_sec * 1000000 + t1.tv_usec) - (t0.tv_sec * 1000000 + t0.tv_usec)) / 1000;
+        std::cout << " Get Box and score  used time: " << mytime_0 << " ms\n";
+        std::cout << "--------------------------------------\n";                                              
+        
     }
-
+    gettimeofday(&t0, NULL);
     // float mytime_exp = (float)((t1.tv_sec * 1000000 + t1.tv_usec) - (t0.tv_sec * 1000000 + t0.tv_usec)) / 1000;
     //quick sort
     (void)TEST_NNIE_Yolo_NonRecursiveArgQuickSort((HI_S32 *)pstBbox, 0, u32BboxNum - 1,
                                                   sizeof(TEST_NNIE_YOLOV3_BBOX_S) / sizeof(HI_U32), 4, (TEST_NNIE_STACK_S *)ps32AssistBuf);
+    gettimeofday(&t1, NULL);
+    std::cout << "--------------------------------------\n";
+    float mytime_3 = (float)((t1.tv_sec * 1000000 + t1.tv_usec) - (t0.tv_sec * 1000000 + t0.tv_usec)) / 1000;
+    std::cout << " QuitSort  used time: " << mytime_3 << " ms\n";
+    std::cout << "--------------------------------------\n";                                              
+
+    gettimeofday(&t0, NULL);                                              
     (void)TEST_NNIE_Yolov2_NonMaxSuppression(pstBbox, u32BboxNum, u32NmsThresh, sizeof(TEST_NNIE_YOLOV3_BBOX_S) / sizeof(HI_U32));
+    gettimeofday(&t1, NULL);
+    std::cout << "--------------------------------------\n";
+    mytime_3 = (float)((t1.tv_sec * 1000000 + t1.tv_usec) - (t0.tv_sec * 1000000 + t0.tv_usec)) / 1000;
+    std::cout << " NMS  used time: " << mytime_3 << " ms\n";
+    std::cout << "--------------------------------------\n";
 
     //Get result
     for (i = 1; i < u32ClassNum; i++)
@@ -3653,6 +4054,8 @@ static HI_S32 TEST_NNIE_Yolov3_GetResult(HI_S32 **pps32InputData, HI_U32 au32Gri
     }
     return HI_SUCCESS;
 }
+#endif 
+
 
 HI_S32 TEST_NNIE_Yolov3_GetResult(graph_t graph,
                                   TEST_NNIE_YOLOV3_SOFTWARE_PARAM_S *pstSoftwareParam)
@@ -3742,11 +4145,9 @@ static HI_S32 TEST_NNIE_Detection_Yolov3_PrintResult(SVP_BLOB_S *pstDstScore,
 
 void TEST_NNIE_Yolov3()
 {
- //  const char *image_file = "./data/nnie_image/rgb_planar/dog_bike_car_416x416.bgr";
+    const char *image_file = "./data/nnie_image/rgb_planar/dog_bike_car_416x416.bgr";
     const char *image_file_org = "./data/nnie_image/rgb_planar/dog_bike_car.jpg";
- //   const char *model_file = "./data/nnie_model/detection/inst_yolov3_cycle.wk";
-	const char *image_file = "./dog_bike_car_416x416.bgr";
-    const char *model_file = "./inst_yolov3_cycle.wk";
+    const char *model_file = "./data/nnie_model/detection/inst_yolov3_cycle.wk";
     struct timeval t0, t1;
     /* prepare input data */
     struct stat statbuf;
@@ -3812,10 +4213,14 @@ void TEST_NNIE_Yolov3()
     gettimeofday(&t0, NULL);
     TEST_NNIE_YOLOV3_SOFTWARE_PARAM_S stSoftWareParam;
     TEST_NNIE_Yolov3_SoftwareInit(graph, &stSoftWareParam);
+    gettimeofday(&t1, NULL);
+    float mytime_1 = (float)((t1.tv_sec * 1000000 + t1.tv_usec) - (t0.tv_sec * 1000000 + t0.tv_usec)) / 1000;
+    std::cout << "\n YoloV3 TEST_NNIE_Yolov3_SoftwareInit  user time  " << mytime_1 << " ms\n";
+    gettimeofday(&t0, NULL);
     TEST_NNIE_Yolov3_GetResult(graph, &stSoftWareParam);
     gettimeofday(&t1, NULL);
     float mytime_2 = (float)((t1.tv_sec * 1000000 + t1.tv_usec) - (t0.tv_sec * 1000000 + t0.tv_usec)) / 1000;
-    std::cout << "\n mytime_2 " << mytime_2 << " ms\n";
+    std::cout << "\n YoloV3 Get the result user time  " << mytime_2 << " ms\n";
     std::cout << "--------------------------------------\n";
 
     printf("print result, this sample has 81 classes:\n");
@@ -4084,6 +4489,7 @@ int main(int argc, char *argv[])
     std::cout << "repeat_count:" << repeat_count << "\n";
 
     init_tengine();
+    // set_log_level(LOG_DEBUG);
     std::cout << "Tengine version: " << get_tengine_version() << "\n";
 
     if (load_tengine_plugin("nnieplugin", "libnnieplugin.so", "nnie_plugin_init") != 0)
