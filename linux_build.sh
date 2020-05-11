@@ -3,7 +3,8 @@
 #Descrition: Use to compile Hisi demo with tengine 
 
 ### You need to modify direction TENGINE_SO_PATH and NNIW_SDK_DEPENDENCE_PATH by yourself .
-TENGINE_SO_PATH=/home/qli/Hisi3516CV500/Tengine1.7.1-Hi3516cv500
+#TENGINE_SO_PATH=/home/qli/Hisi3516CV500/Tengine1.7.1-Hi3516cv500 
+TENGINE_SO_PATH=/home/qli/TE-BU-S000-Hi3516DV300-1.8.0-R20190925
 NNIE_SDK_DEPENDENCE_PATH=/home/qli/Hisi3516CV500/Hi3516CV500R001C02SPC001/01.software/board/Hi3516CV500_SDK_V2.0.0.1/package/mpp_smp_linux
 
 

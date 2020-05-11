@@ -15,7 +15,8 @@ set(LINK_LIBS opencv_core opencv_highgui opencv_imgproc ${LINK_LIBS})
 
 set(LINK_LIBS tengine nnie VoiceEngine upvqe dnvqe mpi securec)
 add_definitions(-rdynamic)
-add_definitions(-mfloat-abi=softfp -mfpu=neon-vfpv4 -mcpu=cortex-a53 -mfpu=neon -Wno-ignored-attributes -lpthread)
+#add_definitions(-mfloat-abi=softfp -mfpu=neon-vfpv4 -mcpu=cortex-a53 -mfpu=neon -Wno-ignored-attributes -lpthread)
+add_definitions(-mcpu=cortex-a7 -mfloat-abi=softfp -mfpu=neon-vfpv4) 
 
 add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-std=c++11>)
 
@@ -38,6 +39,13 @@ install (TARGETS sample_nnie_plugin  DESTINATION install)
 project(test_nnie_all)
 FILE(GLOB CODE_SRCS test_nnie_all.cpp)
 
+FIND_PACKAGE(OpenMP REQUIRED)
+if(OPENMP_FOUND)
+    message("OPENMP FOUND")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+endif()
 #include_directories(${NNIE_SDK_PATH}${PLATFORM}/include)
 #include_directories(../nnie/include)
 #

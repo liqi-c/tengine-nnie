@@ -2,7 +2,8 @@
 # 该脚本在主机环境下运行，需要配置TENGINE_ROOT和NNIE_SDK_PATH的目录，执行目录为挂载的共享目录
 #  执行脚本的目的是为了将依赖文件拷贝到共享目录，然后后面再板卡侧能顺利执行测试程序
 
-TENGINE_ROOT=/home/qli/Hisi3516CV500/Tengine1.7.1-Hi3516cv500/
+#TENGINE_ROOT=/home/qli/Hisi3516CV500/Tengine1.7.1-Hi3516cv500/
+TENGINE_ROOT=/home/qli/TE-BU-S000-Hi3516DV300-1.8.0-R20190925
 NNIE_SDK_PATH=/home/qli/Hisi3516CV500/Hi3516CV500R001C02SPC001/01.software/board/Hi3516CV500_SDK_V2.0.0.1/smp/a7_linux/mpp
 
 if [ "$1" = "LIB" ]; then 
@@ -22,6 +23,8 @@ if [ "$1" = "LIB" ]; then
 	cp ${NNIE_SDK_PATH}/sample/svp/nnie/data  ./ -rf
 	cp ${NNIE_SDK_PATH}/lib/* ./  -rf 
 
+	cp ./inst_yolov3_cycle.wk ./data/nnie_model/detection/inst_yolov3_cycle.wk
+	cp ./dog_bike_car_416x416.bgr ./data/nnie_image/rgb_planar/dog_bike_car_416x416.bgr
 fi
 
 if [ "$1" = "RUN" ]; then 
@@ -33,6 +36,9 @@ if [ "$1" = "RUN" ]; then
 	##  目录到板卡对应的执行目录
 	export LD_LIBRARY_PATH=./   
 	
+	## openmp优化需要 该库是编译器中的,SDK里面没有
+	cp /opt/hisi-linux/x86-arm/arm-himix200-linux/arm-linux-gnueabi/lib/libgomp.so* ./
+
 	./sample_nnie_plugin
 	./test_nnie_all -m 2
 fi
